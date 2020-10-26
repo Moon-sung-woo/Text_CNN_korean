@@ -1,5 +1,7 @@
 ## Introduction
+수정중입니다.
 This is the implementation of Kim's [Convolutional Neural Networks for Sentence Classification](https://arxiv.org/abs/1408.5882) paper in PyTorch.
+I referred to the article posted by Shawn1993.
 
 1. Kim's implementation of the model in Theano:
 [https://github.com/yoonkim/CNN_sentence](https://github.com/yoonkim/CNN_sentence)
