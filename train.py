@@ -24,6 +24,7 @@ def train(train_iter, dev_iter, model, args):
 
             optimizer.zero_grad()
             logit = model(feature)
+
             loss = F.cross_entropy(logit, target)
             loss.backward()
             optimizer.step()
@@ -53,12 +54,15 @@ def train(train_iter, dev_iter, model, args):
 
 
 def eval(data_iter, model, args):
+    #print('여기 들어옴')
     model.eval()
     corrects, avg_loss = 0, 0
     for batch in data_iter:
+
         feature, target = batch.text, batch.label
         feature.t_(), target.sub_(1)  # batch first, index align
         if args.cuda:
+
             feature, target = feature.cuda(), target.cuda()
 
         logit = model(feature)
@@ -75,6 +79,8 @@ def eval(data_iter, model, args):
                                                                        accuracy, 
                                                                        corrects, 
                                                                        size))
+   # print('여기 나감')
+   # print('eval count = ', eval_count)
     return accuracy
 
 

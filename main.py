@@ -2,19 +2,24 @@
 import os
 import argparse
 import datetime
+
 import torch
 import torchtext.data as data
 import torchtext.datasets as datasets
+from torchtext.data import TabularDataset
+from torchtext.data import Iterator
+
 import model
 import train
 import mydatasets
+import pandas as pd
 
 
 parser = argparse.ArgumentParser(description='CNN text classificer')
 # learning
 parser.add_argument('-lr', type=float, default=0.001, help='initial learning rate [default: 0.001]')
 parser.add_argument('-epochs', type=int, default=256, help='number of epochs for train [default: 256]')
-parser.add_argument('-batch-size', type=int, default=64, help='batch size for training [default: 64]')
+parser.add_argument('-batch-size', type=int, default=16, help='batch size for training [default: 64]')
 parser.add_argument('-log-interval',  type=int, default=1,   help='how many steps to wait before logging training status [default: 1]')
 parser.add_argument('-test-interval', type=int, default=100, help='how many steps to wait before testing [default: 100]')
 parser.add_argument('-save-interval', type=int, default=500, help='how many steps to wait before saving [default:500]')
@@ -56,30 +61,63 @@ def sst(text_field, label_field,  **kargs):
 
 # load MR dataset
 def mr(text_field, label_field, **kargs):
-    train_data, dev_data = mydatasets.MR.splits(text_field, label_field)
-    text_field.build_vocab(train_data, dev_data)
+    train_data, dev_data = mydatasets.MR.splits(text_field, label_field) #이거로 train_data, test_data를 만드는거
+    print('여기확인')
+    print(vars(train_data[0]))
+    print(vars(dev_data[2]))
+    print(train_data.fields.items())
+    text_field.build_vocab(train_data, dev_data) # 단어 집합을 생성
     label_field.build_vocab(train_data, dev_data)
+    '''
     train_iter, dev_iter = data.Iterator.splits(
                                 (train_data, dev_data), 
                                 batch_sizes=(args.batch_size, len(dev_data)),
                                 **kargs)
+    '''
+    train_iter = data.Iterator(dataset=train_data, batch_size=args.batch_size)
+    dev_iter = data.Iterator(dataset=dev_data, batch_size=len(dev_data))
+
+    print('훈련 데이터의 미니 배치 수 : {}'.format(len(train_iter)))
+    print('테스트 데이터의 미니 배치 수 : {}'.format(len(dev_iter)))
     return train_iter, dev_iter
 
+def msw_text(text_field, label_field, **kargs):
+    train_data, dev_data = mydatasets.MR_2.splits(text_field, label_field)  # 이거로 train_data, test_data를 만드는거
 
+    text_field.build_vocab(train_data, dev_data)  # 단어 집합을 생성
+    label_field.build_vocab(train_data, dev_data)
+
+    train_iter, dev_iter = data.Iterator.splits(
+                                (train_data, dev_data), 
+                                batch_sizes=(args.batch_size, len(dev_data)),
+                                **kargs)
+    '''
+    train_iter = data.Iterator(dataset=train_data, batch_size=args.batch_size)
+    dev_iter = data.Iterator(dataset=dev_data, batch_size=len(dev_data))
+    '''
+    print('훈련 데이터의 미니 배치 수 : {}'.format(len(train_iter)))
+    print('테스트 데이터의 미니 배치 수 : {}'.format(len(dev_iter)))
+    return train_iter, dev_iter
 # load data
 print("\nLoading data...")
 text_field = data.Field(lower=True)
 label_field = data.Field(sequential=False)
-train_iter, dev_iter = mr(text_field, label_field, device=-1, repeat=False)
+#train_iter, dev_iter = mr(text_field, label_field, device=-1, repeat=False)
+train_iter, dev_iter = msw_text(text_field, label_field, device=-1, repeat=False)
+
+batch = next(iter(train_iter))
+print(type(batch))
+print(batch.text)
+
 # train_iter, dev_iter, test_iter = sst(text_field, label_field, device=-1, repeat=False)
 
 
 # update args and print
-args.embed_num = len(text_field.vocab)
+args.embed_num = len(text_field.vocab) # .vocab을 해주면 단어 집합을 만들어 주는거 같다. 일단 추정
 args.class_num = len(label_field.vocab) - 1
 args.cuda = (not args.no_cuda) and torch.cuda.is_available(); del args.no_cuda
 args.kernel_sizes = [int(k) for k in args.kernel_sizes.split(',')]
-args.save_dir = os.path.join(args.save_dir, datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S'))
+args.save_dir = os.path.join(args.save_dir, datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S') + 're')
 
 print("\nParameters:")
 for attr, value in sorted(args.__dict__.items()):
@@ -101,13 +139,9 @@ if args.cuda:
 if args.predict is not None:
     label = train.predict(args.predict, cnn, text_field, label_field, args.cuda)
     print('\n[Text]  {}\n[Label] {}\n'.format(args.predict, label))
-elif args.test:
-    try:
-        train.eval(test_iter, cnn, args) 
-    except Exception as e:
-        print("\nSorry. The test dataset doesn't  exist.\n")
+
 else:
-    print()
+
     try:
         train.train(train_iter, dev_iter, cnn, args)
     except KeyboardInterrupt:
