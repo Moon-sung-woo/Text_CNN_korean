@@ -13,9 +13,9 @@ I referred to the article posted by Shawn1993.[https://github.com/Shawn1993/cnn-
 [https://github.com/alexander-rakhlin/CNN-for-Sentence-Classification-in-Keras](https://github.com/alexander-rakhlin/CNN-for-Sentence-Classification-in-Keras)
 
 ## Requirement
-* python 3
-* pytorch > 0.1
-* torchtext > 0.1
+* python 3.6.9
+* pytorch  1.3.1
+* torchtext  0.2
 * numpy
 
 ## Result
