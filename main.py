@@ -40,7 +40,7 @@ parser.add_argument('-device', type=int, default=-1, help='device to use for ite
 parser.add_argument('-no-cuda', action='store_true', default=False, help='disable the gpu')
 # option
 parser.add_argument('-snapshot', type=str, default=None, help='filename of model snapshot [default: None]')
-parser.add_argument('-predict', type=str, default=None, help='predict the sentence given')
+parser.add_argument('-predict', type=str, default="Hello my dear , I love you so much.", help='predict the sentence given')
 parser.add_argument('-test', action='store_true', default=False, help='train or test')
 args = parser.parse_args()
 
@@ -105,9 +105,9 @@ label_field = data.Field(sequential=False)
 #train_iter, dev_iter = mr(text_field, label_field, device=-1, repeat=False)
 train_iter, dev_iter = msw_text(text_field, label_field, device=-1, repeat=False)
 
-batch = next(iter(train_iter))
-print(type(batch))
-print(batch.text)
+# batch = next(iter(train_iter))
+# print(type(batch))
+# print(batch.text)
 
 # train_iter, dev_iter, test_iter = sst(text_field, label_field, device=-1, repeat=False)
 
@@ -141,7 +141,6 @@ if args.predict is not None:
     print('\n[Text]  {}\n[Label] {}\n'.format(args.predict, label))
 
 else:
-
     try:
         train.train(train_iter, dev_iter, cnn, args)
     except KeyboardInterrupt:

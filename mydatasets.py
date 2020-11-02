@@ -168,9 +168,9 @@ class MR_2(TarDataset):
                     text = line[:-3]
                     label = line[-2]
                     if label == '1':
-                        examples += [data.Example.fromlist([text, 'negative'], fields)]
-                    else:
                         examples += [data.Example.fromlist([text, 'positive'], fields)]
+                    else:
+                        examples += [data.Example.fromlist([text, 'negative'], fields)]
 
         super(MR_2, self).__init__(examples, fields, **kwargs)
 
