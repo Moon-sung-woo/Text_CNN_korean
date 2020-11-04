@@ -1,4 +1,3 @@
-#! /usr/bin/env python
 import os
 import argparse
 import datetime
@@ -6,19 +5,14 @@ import datetime
 import torch
 import torchtext.data as data
 import torchtext.datasets as datasets
-from torchtext.data import TabularDataset
-from torchtext.data import Iterator
 
 import model
 import train
 import mydatasets
-import pandas as pd
-
-
+''''''
 parser = argparse.ArgumentParser(description='CNN text classificer')
 # learning
-parser.add_argument('-lr', type=float, default=0.001, help='initial learning rate [default: 0.001]')
-parser.add_argument('-epochs', type=int, default=256, help='number of epochs for train [default: 256]')
+
 parser.add_argument('-batch-size', type=int, default=16, help='batch size for training [default: 64]')
 parser.add_argument('-log-interval',  type=int, default=1,   help='how many steps to wait before logging training status [default: 1]')
 parser.add_argument('-test-interval', type=int, default=100, help='how many steps to wait before testing [default: 100]')
@@ -26,7 +20,7 @@ parser.add_argument('-save-interval', type=int, default=500, help='how many step
 parser.add_argument('-save-dir', type=str, default='snapshot', help='where to save the snapshot')
 parser.add_argument('-early-stop', type=int, default=1000, help='iteration numbers to stop without performance increasing')
 parser.add_argument('-save-best', type=bool, default=True, help='whether to save when get best performance')
-# data 
+# data
 parser.add_argument('-shuffle', action='store_true', default=False, help='shuffle the data every epoch')
 # model
 parser.add_argument('-dropout', type=float, default=0.5, help='the probability for dropout [default: 0.5]')
@@ -39,47 +33,12 @@ parser.add_argument('-static', action='store_true', default=False, help='fix the
 parser.add_argument('-device', type=int, default=-1, help='device to use for iterate data, -1 mean cpu [default: -1]')
 parser.add_argument('-no-cuda', action='store_true', default=False, help='disable the gpu')
 # option
-parser.add_argument('-snapshot', type=str, default=None, help='filename of model snapshot [default: None]')
-parser.add_argument('-predict', type=str, default=None, help='predict the sentence given')
+parser.add_argument('-snapshot', type=str, default="snapshot/2020-11-03_06-17-04co/best_steps_100.pt", help='filename of model snapshot [default: None]')
+parser.add_argument('-predict', type=str, default="나는 오늘 정말 행복해", help='predict the sentence given')
 parser.add_argument('-test', action='store_true', default=False, help='train or test')
 args = parser.parse_args()
 
-
-# load SST dataset
-def sst(text_field, label_field,  **kargs):
-    train_data, dev_data, test_data = datasets.SST.splits(text_field, label_field, fine_grained=True)
-    text_field.build_vocab(train_data, dev_data, test_data)
-    label_field.build_vocab(train_data, dev_data, test_data)
-    train_iter, dev_iter, test_iter = data.BucketIterator.splits(
-                                        (train_data, dev_data, test_data), 
-                                        batch_sizes=(args.batch_size, 
-                                                     len(dev_data), 
-                                                     len(test_data)),
-                                        **kargs)
-    return train_iter, dev_iter, test_iter 
-
-
-# load MR dataset
-def mr(text_field, label_field, **kargs):
-    train_data, dev_data = mydatasets.MR.splits(text_field, label_field) #이거로 train_data, test_data를 만드는거
-    print('여기확인')
-    print(vars(train_data[0]))
-    print(vars(dev_data[2]))
-    print(train_data.fields.items())
-    text_field.build_vocab(train_data, dev_data) # 단어 집합을 생성
-    label_field.build_vocab(train_data, dev_data)
-    '''
-    train_iter, dev_iter = data.Iterator.splits(
-                                (train_data, dev_data), 
-                                batch_sizes=(args.batch_size, len(dev_data)),
-                                **kargs)
-    '''
-    train_iter = data.Iterator(dataset=train_data, batch_size=args.batch_size)
-    dev_iter = data.Iterator(dataset=dev_data, batch_size=len(dev_data))
-
-    print('훈련 데이터의 미니 배치 수 : {}'.format(len(train_iter)))
-    print('테스트 데이터의 미니 배치 수 : {}'.format(len(dev_iter)))
-    return train_iter, dev_iter
+batch_size = 16
 
 def msw_text(text_field, label_field, **kargs):
     train_data, dev_data = mydatasets.MR_2.splits(text_field, label_field)  # 이거로 train_data, test_data를 만드는거
@@ -88,7 +47,7 @@ def msw_text(text_field, label_field, **kargs):
     label_field.build_vocab(train_data, dev_data)
 
     train_iter, dev_iter = data.Iterator.splits(
-                                (train_data, dev_data), 
+                                (train_data, dev_data),
                                 batch_sizes=(args.batch_size, len(dev_data)),
                                 **kargs)
     '''
@@ -120,7 +79,7 @@ args.embed_num = len(text_field.vocab) # .vocab을 해주면 단어 집합을 �
 args.class_num = len(label_field.vocab) - 1
 args.cuda = (not args.no_cuda) and torch.cuda.is_available(); del args.no_cuda
 args.kernel_sizes = [int(k) for k in args.kernel_sizes.split(',')]
-args.save_dir = os.path.join(args.save_dir, datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S') + 'co')
+
 
 print("\nParameters:")
 for attr, value in sorted(args.__dict__.items()):
@@ -136,17 +95,6 @@ if args.snapshot is not None:
 if args.cuda:
     torch.cuda.set_device(args.device)
     cnn = cnn.cuda()
-        
 
-# train or predict
-if args.predict is not None:
-    label = train.predict(args.predict, cnn, text_field, label_field, args.cuda)
-    print('\n[Text]  {}\n[Label] {}\n'.format(args.predict, label))
-
-else:
-    try:
-        train.train(train_iter, dev_iter, cnn, args)
-    except KeyboardInterrupt:
-        print('\n' + '-' * 89)
-        print('Exiting from training early')
-
+label = train.predict(args.predict, cnn, text_field, label_field, args.cuda)
+print('\n[Text]  {}\n[Label] {}\n'.format(args.predict, label))

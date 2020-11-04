@@ -4,6 +4,7 @@ import random
 import tarfile
 import urllib
 from torchtext import data
+from konlpy.tag import Mecab
 
 
 class TarDataset(data.Dataset):
@@ -116,9 +117,9 @@ class MR(TarDataset):
 
 class MR_2(TarDataset):
 
-    url = 'https://www.cs.cornell.edu/people/pabo/movie-review-data/rt-polaritydata.tar.gz'
-    filename = 'rt-polaritydata.tar.gz'
-    dirname = 'rt-polaritydata'
+    # url = 'https://www.cs.cornell.edu/people/pabo/movie-review-data/rt-polaritydata.tar.gz'
+    # filename = 'rt-polaritydata.tar.gz'
+    # dirname = 'rt-polaritydata'
 
     @staticmethod
     def sort_key(ex):
@@ -154,23 +155,38 @@ class MR_2(TarDataset):
             string = re.sub(r"\?", " \? ", string)
             string = re.sub(r"\s{2,}", " ", string)
             return string.strip()
+        #---------------------------------------------------
+        tokenizer = Mecab()
+        text_field.tokenize = tokenizer.morphs
+        #---------------------------------------------------
 
-        text_field.tokenize = lambda x: clean_str(x).split()
+        #text_field.tokenize = lambda x: clean_str(x).split()
         fields = [('text', text_field), ('label', label_field)]
 
         if examples is None:
 
             examples = []
-            with open(path, errors='ignore') as f:
+            with open(path, errors='ignore', encoding='cp949') as f:
                 # examples += [
                 #     data.Example.fromlist([line, 'negative'], fields) for line in f]
                 for line in f:
                     text = line[:-3]
                     label = line[-2]
-                    if label == '1':
-                        examples += [data.Example.fromlist([text, 'positive'], fields)]
-                    else:
-                        examples += [data.Example.fromlist([text, 'negative'], fields)]
+                    print('line : ', line)
+                    print('text : ', text)
+                    print('label : ', label)
+                    if label == '0': #일반 대화
+                        examples += [data.Example.fromlist([text, '0'], fields)]
+                    elif label == '1': # 협박
+                        examples += [data.Example.fromlist([text, '1'], fields)]
+                    elif label == '2': # 갈취공갈
+                        examples += [data.Example.fromlist([text, '2'], fields)]
+                    elif label == '3': # 직장내 괴롭힘
+                        examples += [data.Example.fromlist([text, '3'], fields)]
+                    else: # 기타 괴롭힘
+                        examples += [data.Example.fromlist([text, '4'], fields)]
+
+
 
         super(MR_2, self).__init__(examples, fields, **kwargs)
 
@@ -191,7 +207,7 @@ class MR_2(TarDataset):
                 Dataset.
         """
         #path = cls.download_or_unzip(root)
-        path = 'train_data.csv'
+        path = 'k_test.csv'
         examples = cls(text_field, label_field, path=path, **kwargs).examples
         if shuffle: random.shuffle(examples)
         dev_index = -1 * int(dev_ratio*len(examples))
