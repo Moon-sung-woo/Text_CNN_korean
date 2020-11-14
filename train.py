@@ -14,6 +14,7 @@ def train(train_iter, dev_iter, model, args):
     steps = 0
     best_acc = 0
     last_step = 0
+
     for epoch in range(1, args.epochs+1):
         for batch in train_iter:
             model.train()
@@ -46,12 +47,13 @@ def train(train_iter, dev_iter, model, args):
                     last_step = steps
                     if args.save_best:
                         save(model, args.save_dir, 'best', steps)
+
                 else:
                     if steps - last_step >= args.early_stop:
                         print('early stop by {} steps.'.format(args.early_stop))
             elif steps % args.save_interval == 0:
                 save(model, args.save_dir, 'snapshot', steps)
-
+    return -dev_acc
 
 def eval(data_iter, model, args):
     #print('여기 들어옴')
@@ -94,11 +96,16 @@ def predict(text, model, text_field, label_feild, cuda_flag):
     x = autograd.Variable(x)
     if cuda_flag:
         x = x.cuda()
-    print(x)
+    #print(x)
     output = model(x)
+    return output
+
+    '''
+    여기가 원래 소스코드
+    print("output : ", output)
     _, predicted = torch.max(output, 1)
     return label_feild.vocab.itos[predicted.item()+1]
-
+    '''
 
 def save(model, save_dir, save_prefix, steps):
     if not os.path.isdir(save_dir):

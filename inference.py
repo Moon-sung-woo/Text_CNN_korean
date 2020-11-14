@@ -9,6 +9,9 @@ import torchtext.datasets as datasets
 import model
 import train
 import mydatasets
+import pandas as pd
+import numpy as np
+
 ''''''
 parser = argparse.ArgumentParser(description='CNN text classificer')
 # learning
@@ -95,6 +98,24 @@ if args.snapshot is not None:
 if args.cuda:
     torch.cuda.set_device(args.device)
     cnn = cnn.cuda()
+#----------------------------------------------------------------------------------------------------
+input_path  = "datas/asr_output_sample.csv"
 
+#preprocess
+pd_input_data = pd.read_csv(input_path)
+
+#model_inference
+result = np.zeros((len(pd_input_data), 5))
+
+for i, data in enumerate(pd_input_data[['filename', 'id', 'script']].values):
+    script_text = data[2]
+    label = train.predict(script_text, cnn, text_field, label_field, args.cuda)
+    print('\n[Text]  {}\n[Label] {}\n'.format(script_text, label))
+    result[i] = label.cpu().detach().numpy()
+
+print(result)
+
+'''
 label = train.predict(args.predict, cnn, text_field, label_field, args.cuda)
 print('\n[Text]  {}\n[Label] {}\n'.format(args.predict, label))
+'''

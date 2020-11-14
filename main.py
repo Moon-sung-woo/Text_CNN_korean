@@ -6,20 +6,19 @@ import datetime
 import torch
 import torchtext.data as data
 import torchtext.datasets as datasets
-from torchtext.data import TabularDataset
-from torchtext.data import Iterator
-
 import model
 import train
 import mydatasets
 import pandas as pd
+
+from GPyOpt.methods import BayesianOptimization
 
 
 parser = argparse.ArgumentParser(description='CNN text classificer')
 # learning
 parser.add_argument('-lr', type=float, default=0.001, help='initial learning rate [default: 0.001]')
 parser.add_argument('-epochs', type=int, default=256, help='number of epochs for train [default: 256]')
-parser.add_argument('-batch-size', type=int, default=16, help='batch size for training [default: 64]')
+parser.add_argument('-batch-size', type=int, default=512, help='batch size for training [default: 64]')
 parser.add_argument('-log-interval',  type=int, default=1,   help='how many steps to wait before logging training status [default: 1]')
 parser.add_argument('-test-interval', type=int, default=100, help='how many steps to wait before testing [default: 100]')
 parser.add_argument('-save-interval', type=int, default=500, help='how many steps to wait before saving [default:500]')
@@ -40,11 +39,23 @@ parser.add_argument('-device', type=int, default=-1, help='device to use for ite
 parser.add_argument('-no-cuda', action='store_true', default=False, help='disable the gpu')
 # option
 parser.add_argument('-snapshot', type=str, default=None, help='filename of model snapshot [default: None]')
-parser.add_argument('-predict', type=str, default=None, help='predict the sentence given')
+parser.add_argument('-baye', type=bool, default=False)
 parser.add_argument('-test', action='store_true', default=False, help='train or test')
+#path
+parser.add_argument('-input_path', type=str, default='datas/EDA_g2pk_concat.csv') # clean_g2pk, clean_g2pk_withEDA, EDA_g2pk_concat
 args = parser.parse_args()
 
 
+
+domain = [{'name': 'lr_rate',
+          'type': 'continuous',
+          'domain': (0.001, 0.01),
+           'dimensionality': 1},
+            {'name': 'dropout',
+          'type': 'continuous',
+          'domain': (0.4, 1),
+           'dimensionality': 1}]
+hyper = []
 # load SST dataset
 def sst(text_field, label_field,  **kargs):
     train_data, dev_data, test_data = datasets.SST.splits(text_field, label_field, fine_grained=True)
@@ -81,8 +92,8 @@ def mr(text_field, label_field, **kargs):
     print('테스트 데이터의 미니 배치 수 : {}'.format(len(dev_iter)))
     return train_iter, dev_iter
 
-def msw_text(text_field, label_field, **kargs):
-    train_data, dev_data = mydatasets.MR_2.splits(text_field, label_field)  # 이거로 train_data, test_data를 만드는거
+def msw_text(text_field, label_field, args, **kargs):
+    train_data, dev_data = mydatasets.MR_2.splits(text_field, label_field, args, shuffle=True)  # 이거로 train_data, test_data를 만드는거
 
     text_field.build_vocab(train_data, dev_data)  # 단어 집합을 생성
     label_field.build_vocab(train_data, dev_data)
@@ -100,13 +111,33 @@ def msw_text(text_field, label_field, **kargs):
     print('테스트 데이터의 미니 배치 수 : {}'.format(len(dev_iter)))
     return train_iter, dev_iter
 
+def baye(arg):
+    learning_rate = arg[0, 0]
+    drop_out = arg[0, 1]
+    args.lr = learning_rate
+    args.dropout = drop_out
+
+    cnn = model.CNN_Text(args)
+    if args.snapshot is not None:
+        print('\nLoading model from {}...'.format(args.snapshot))
+        cnn.load_state_dict(torch.load(args.snapshot))
+
+    if args.cuda:
+        torch.cuda.set_device(args.device)
+        cnn = cnn.cuda()
+
+    global hyper
+    baye_value = train.train(train_iter, dev_iter, cnn, args)
+
+    return baye_value
+
 
 # load data
 print("\nLoading data...")
 text_field = data.Field(lower=True)
 label_field = data.Field(sequential=False)
 #train_iter, dev_iter = mr(text_field, label_field, device=-1, repeat=False)
-train_iter, dev_iter = msw_text(text_field, label_field, device=-1, repeat=False)
+train_iter, dev_iter = msw_text(text_field, label_field, args, device=-1, repeat=False)
 
 # batch = next(iter(train_iter))
 # print(type(batch))
@@ -120,31 +151,34 @@ args.embed_num = len(text_field.vocab) # .vocab을 해주면 단어 집합을 �
 args.class_num = len(label_field.vocab) - 1
 args.cuda = (not args.no_cuda) and torch.cuda.is_available(); del args.no_cuda
 args.kernel_sizes = [int(k) for k in args.kernel_sizes.split(',')]
-args.save_dir = os.path.join(args.save_dir, datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S') + 'co')
+args.save_dir = os.path.join(args.save_dir, datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S') + 'EDA_g2pk_concat')
+
 
 print("\nParameters:")
 for attr, value in sorted(args.__dict__.items()):
     print("\t{}={}".format(attr.upper(), value))
 
 
-# model
-cnn = model.CNN_Text(args)
-if args.snapshot is not None:
-    print('\nLoading model from {}...'.format(args.snapshot))
-    cnn.load_state_dict(torch.load(args.snapshot))
-
-if args.cuda:
-    torch.cuda.set_device(args.device)
-    cnn = cnn.cuda()
-        
-
 # train or predict
-if args.predict is not None:
-    label = train.predict(args.predict, cnn, text_field, label_field, args.cuda)
-    print('\n[Text]  {}\n[Label] {}\n'.format(args.predict, label))
+if args.baye:
+    print('옵티마이즈 세팅')
+    myBopt = BayesianOptimization(f=baye, domain=domain, initial_design_numdata=5)
+    print('옵티마이즈 시작')
+    myBopt.run_optimization(max_iter=10)
+    print('옵티마이즈 결과 : ', myBopt.x_opt)
+    print('최적의 하이퍼 파라미터의 결과의 파라미터', args.lr, args.dropout)
 
 else:
     try:
+        cnn = model.CNN_Text(args)
+        if args.snapshot is not None:
+            print('\nLoading model from {}...'.format(args.snapshot))
+            cnn.load_state_dict(torch.load(args.snapshot))
+
+        if args.cuda:
+            torch.cuda.set_device(args.device)
+            cnn = cnn.cuda()
+
         train.train(train_iter, dev_iter, cnn, args)
     except KeyboardInterrupt:
         print('\n' + '-' * 89)

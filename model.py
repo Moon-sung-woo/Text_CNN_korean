@@ -38,4 +38,9 @@ class CNN_Text(nn.Module):
 
         x = self.dropout(x)  # (N, len(Ks)*Co)
         logit = self.fc1(x)  # (N, C)
+
+        ############################################여기 추가
+        #logit = F.softmax(logit, dim=1)
+        ############################################여기 추가
+
         return logit
