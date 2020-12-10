@@ -11,6 +11,7 @@ import train
 import mydatasets
 import pandas as pd
 import glob
+import time
 
 from GPyOpt.methods import BayesianOptimization
 
@@ -189,10 +190,11 @@ def text_cnn_train(args, train_path):
             print('Exiting from training early')
 
 train_path = []
-train_data_path = 'traindata'
+train_data_path = 'traindata_v4'
 file_list = glob.glob(os.path.join(train_data_path, '*'))
 file_list.sort()
 print(file_list)
+time.sleep(3)
 for file in file_list:
     text_cnn_train(args, file)
     print('finish')
